@@ -87,7 +87,25 @@ const services = Array.isArray(json?.data) ? json.data : [];
                     ) : null}
                   </div>
 
-                  <div style="margin-top: 10px;">
+                  <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+                    <a
+                      href={`/editor/services/${s.documentId ?? String(s.id)}`}
+                      style="
+                        display: inline-flex;
+                        align-items: center;
+                        padding: 6px 12px;
+                        border-radius: 6px;
+                        text-decoration: none;
+                        background: #0070f3;
+                        color: white;
+                        font-size: 14px;
+                        transition: background 0.2s ease;
+                      "
+                      onmouseover="this.style.background='#0051cc'"
+                      onmouseout="this.style.background='#0070f3'"
+                    >
+                      Editar
+                    </a>
                     <form
                       method="POST"
                       action={`/api/panel/services/${s.documentId ?? String(s.id)}/delete`}
