@@ -1,26 +1,17 @@
 ---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { resolveMediaUrl, pickServiceFields, getServiceImageUrl } from "../utils/strapi";
+
 const STRAPI_URL = import.meta.env.PUBLIC_STRAPI_URL ?? "http://localhost:1337";
 
-function resolveMediaUrl(media) {
-  if (!media) return null;
+/* ---------------------------
+   1) HOME
+----------------------------*/
+const resHome = await fetch(`${STRAPI_URL}/api/home?populate=*`);
+if (!resHome.ok) throw new Error(`Strapi error (home): ${resHome.status}`);
 
-  // Soporta distintas formas del objeto media (según Strapi/config)
-  const url =
-    media?.url ??
-    media?.data?.attributes?.url ??
-    media?.data?.url ??
-    null;
-
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  return `${STRAPI_URL}${url}`;
-}
-
-const res = await fetch(`${STRAPI_URL}/api/home?populate=*`);
-if (!res.ok) throw new Error(`Strapi error: ${res.status}`);
-
-const json = await res.json();
-const home = json?.data ?? null;
+const jsonHome = await resHome.json();
+const home = jsonHome?.data ?? null;
 
 // Compatible con variantes de estructura
 const heroTitle = home?.heroTitle ?? home?.attributes?.heroTitle ?? "";
@@ -28,25 +19,85 @@ const heroSubtitle = home?.heroSubtitle ?? home?.attributes?.heroSubtitle ?? "";
 const heroImage = home?.heroImage ?? home?.attributes?.heroImage ?? null;
 
 const heroImageUrl = resolveMediaUrl(heroImage);
+
+/* ---------------------------
+   2) SERVICES
+----------------------------*/
+let services = [];
+let servicesError = null;
+
+try {
+  const resServices = await fetch(
+    `${STRAPI_URL}/api/services?populate=image&sort=title:asc`
+  );
+  if (!resServices.ok) {
+    throw new Error(`Strapi error (services): ${resServices.status}`);
+  }
+
+  const jsonServices = await resServices.json();
+  const rows = jsonServices?.data ?? [];
+  services = rows.map(pickServiceFields);
+} catch (e) {
+  servicesError = e?.message ?? "Error desconocido cargando servicios.";
+}
 ---
 
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>Demo Strapi + Astro</title>
-  </head>
+<BaseLayout title="Demo Strapi + Astro" description="Portal construido con Strapi y Astro">
+    <!-- HOME -->
+    <section class="card">
+      <h1>{heroTitle}</h1>
+      <p>{heroSubtitle}</p>
 
-  <body style="font-family: system-ui; padding: 32px; max-width: 900px; margin: 0 auto;">
-    <h1>{heroTitle}</h1>
-    <p>{heroSubtitle}</p>
+      {heroImageUrl && (
+        <img
+          src={heroImageUrl}
+          alt="Hero"
+          style="max-width: 100%; border-radius: 12px; margin-top: 16px;"
+          loading="lazy"
+        />
+      )}
+    </section>
 
-    {heroImageUrl && (
-      <img
-        src={heroImageUrl}
-        alt="Hero"
-        style="max-width: 100%; border-radius: 12px; margin-top: 16px;"
-      />
-    )}
-  </body>
-</html>
+    <!-- SERVICIOS -->
+    <section class="card" style="margin-top: 24px;">
+      <h2 style="margin: 0;">Servicios</h2>
+      <p style="margin: 8px 0 0; color: #666;">
+        Fuente: <code>{STRAPI_URL}/api/services?populate=image&sort=title:asc</code>
+      </p>
+
+      {servicesError ? (
+        <div class="card error" style="margin-top: 12px;">
+          <strong>No se pudieron cargar los servicios.</strong>
+          <div>{servicesError}</div>
+        </div>
+      ) : services.length === 0 ? (
+        <p style="margin-top: 12px; color: #666;">No hay servicios creados todavía.</p>
+      ) : (
+        <div class="grid">
+          {services.map((s) => {
+            const imgUrl = getServiceImageUrl(s.image);
+
+            return (
+              <article class="service">
+                <div class="service-media">
+                  {imgUrl ? (
+                    <img src={imgUrl} alt={s.title || "Servicio"} loading="lazy" />
+                  ) : (
+                    <span style="color:#666; font-size:.9rem;">Sin imagen</span>
+                  )}
+                </div>
+
+                <div class="service-body">
+                  <h3 class="service-title">{s.title}</h3>
+                  <div class="service-meta">
+                    icon: <code>{s.icon || "-"}</code>
+                  </div>
+                  <p class="service-desc">{s.description}</p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+</BaseLayout>
