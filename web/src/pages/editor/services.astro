@@ -1,0 +1,220 @@
+---
+export const prerender = false;
+
+const STRAPI_URL = import.meta.env.PUBLIC_STRAPI_URL ?? "http://localhost:1337";
+
+function resolveMediaUrl(media) {
+  if (!media) return null;
+
+  const url =
+    media?.formats?.thumbnail?.url ??
+    media?.formats?.small?.url ??
+    media?.url ??
+    media?.data?.attributes?.formats?.thumbnail?.url ??
+    media?.data?.attributes?.url ??
+    null;
+
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  return `${STRAPI_URL}${url}`;
+}
+
+const r = await fetch(new URL("/api/panel/services", Astro.url));
+if (!r.ok) throw new Error(`No se pudo cargar services: ${r.status}`);
+
+const json = await r.json();
+const services = Array.isArray(json?.data) ? json.data : [];
+---
+
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Panel - Services</title>
+  </head>
+
+  <body style="font-family: system-ui; padding: 32px; max-width: 1100px; margin: 0 auto;">
+    <header style="display:flex; align-items:center; justify-content:space-between; gap: 16px;">
+      <div>
+        <h1 style="margin:0;">Panel: Servicios</h1>
+        <p style="margin:6px 0 0 0; color:#555;">
+          Listado de servicios cargados en Strapi (Collection Type: Service)
+        </p>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:center;">
+        <a href="/editor/home" style="text-decoration:none;">Ir a Home</a>
+        <a href="/" target="_blank" style="text-decoration:none;">Ver portal</a>
+      </div>
+    </header>
+
+    <hr style="margin: 18px 0;" />
+
+    <section style="margin: 18px 0; padding: 14px; border: 1px solid #eee; border-radius: 12px;">
+      <h2 style="margin:0 0 10px 0;">Crear nuevo servicio (MVP)</h2>
+
+      <form id="createForm" style="display:grid; gap: 10px; max-width: 760px;">
+        <label>
+          <div style="font-weight:600;">Título</div>
+          <input name="title" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px;" />
+        </label>
+
+        <label>
+          <div style="font-weight:600;">Descripción</div>
+          <textarea name="description" rows="3" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px;"></textarea>
+        </label>
+
+        <label>
+          <div style="font-weight:600;">Icon (palabra clave)</div>
+          <input name="icon" placeholder="Ej: bell, chart, shield" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px;" />
+        </label>
+
+        <label>
+          <div style="font-weight:600;">Imagen (opcional)</div>
+          <input id="fileInput" type="file" accept="image/*" />
+        </label>
+
+        <button type="submit" style="padding:10px 14px; border-radius:10px; border:0; cursor:pointer; width: fit-content;">
+          Crear
+        </button>
+
+        <div id="createStatus"></div>
+      </form>
+    </section>
+
+    <section>
+      <h2 style="margin: 0 0 10px 0;">Servicios existentes ({services.length})</h2>
+
+      {services.length === 0 ? (
+        <p style="color:#666;">No hay servicios creados.</p>
+      ) : (
+        <div style="display:grid; gap: 12px;">
+          {services.map((s) => {
+            const imgUrl = resolveMediaUrl(s.image);
+
+            return (
+              <article style="display:grid; grid-template-columns: 140px 1fr; gap: 14px; padding: 14px; border: 1px solid #eee; border-radius: 12px;">
+                <div>
+                  {imgUrl ? (
+                    <img src={imgUrl} alt={s.title} style="width:140px; height: 94px; object-fit: cover; border-radius: 10px;" />
+                  ) : (
+                    <div style="width:140px; height: 94px; background:#f3f3f3; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#777;">
+                      sin imagen
+                    </div>
+                  )}
+                </div>
+
+                <div style="min-width: 0;">
+                  <h3 style="margin:0; line-height: 1.2;">{s.title}</h3>
+
+                  <div style="margin-top: 6px; color:#555; white-space: normal;">
+                    {s.description}
+                  </div>
+
+                  <div style="margin-top: 8px; color:#666; font-size: 14px;">
+                    <strong>icon:</strong> {s.icon || "(vacío)"} · <strong>id:</strong> {s.id}
+                    {s.documentId ? (
+                      <span>
+                        {" "}
+                        · <strong>documentId:</strong> {s.documentId}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div style="margin-top: 10px;">
+                    <form
+                      method="POST"
+                      action={`/api/panel/services/${s.documentId ?? String(s.id)}/delete`}
+                      onsubmit="return confirm('¿Seguro que deseas eliminar este servicio? Esta acción no se puede deshacer.');"
+                      style="display:inline;"
+                    >
+                      <button
+                        type="submit"
+                        style="padding:6px 12px; border-radius:6px; border:0; cursor:pointer; background:#dc3545; color:white; font-size:14px;"
+                      >
+                        Eliminar
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+
+    <script is:inline>
+      window.addEventListener("DOMContentLoaded", () => {
+        const form = document.querySelector("#createForm");
+        const statusEl = document.querySelector("#createStatus");
+        const fileInput = document.querySelector("#fileInput");
+
+        if (!form || !statusEl) return;
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          statusEl.textContent = "Creando servicio...";
+
+          try {
+            let imageId = null;
+            const file = fileInput && fileInput.files && fileInput.files[0];
+
+            if (file) {
+              statusEl.textContent = "Subiendo imagen...";
+              const fd = new FormData();
+              fd.append("files", file, file.name);
+
+              const upRes = await fetch("/api/panel/upload", { method: "POST", body: fd });
+              const upText = await upRes.text();
+
+              if (!upRes.ok) {
+                statusEl.textContent = "Error subiendo imagen: " + upText;
+                return;
+              }
+
+              const uploaded = JSON.parse(upText);
+              const fileObj = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+              imageId = fileObj && fileObj.id ? fileObj.id : null;
+
+              if (!imageId) {
+                statusEl.textContent = "No se pudo obtener id de imagen.";
+                return;
+              }
+            }
+
+            const fd2 = new FormData(form);
+            const payload = {
+              title: String(fd2.get("title") ?? ""),
+              description: String(fd2.get("description") ?? ""),
+              icon: String(fd2.get("icon") ?? ""),
+            };
+
+            if (imageId) payload.image = imageId;
+
+            statusEl.textContent = "Guardando servicio...";
+
+            const res = await fetch("/api/panel/services", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+
+            const text = await res.text();
+            if (!res.ok) {
+              statusEl.textContent = "Error creando servicio: " + text;
+              return;
+            }
+
+            statusEl.textContent = "Servicio creado. Recargando...";
+            window.location.reload();
+          } catch (err) {
+            console.error(err);
+            statusEl.textContent = "Error de red. Revisa consola.";
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

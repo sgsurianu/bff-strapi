@@ -1,0 +1,269 @@
+---
+const STRAPI_URL = import.meta.env.PUBLIC_STRAPI_URL ?? "http://localhost:1337";
+
+function resolveMediaUrl(media: any) {
+  if (!media) return null;
+
+  const url =
+    media?.url ??
+    media?.data?.attributes?.url ??
+    media?.data?.url ??
+    media?.attributes?.url ??
+    null;
+
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  return `${STRAPI_URL}${url}`;
+}
+
+const r = await fetch(new URL("/api/panel/home", Astro.url));
+if (!r.ok) throw new Error(`No se pudo cargar Home: ${r.status}`);
+
+const json = await r.json();
+const home = json?.data ?? null;
+
+// Compatible con variantes de estructura de Strapi
+const heroTitle = home?.heroTitle ?? home?.attributes?.heroTitle ?? "";
+const heroSubtitle = home?.heroSubtitle ?? home?.attributes?.heroSubtitle ?? "";
+
+// Media actual (para mostrar preview)
+const heroImage = home?.heroImage ?? home?.attributes?.heroImage ?? null;
+const heroImageUrl = resolveMediaUrl(heroImage);
+---
+
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Panel - Home</title>
+  </head>
+
+  <body
+    style="
+      font-family: system-ui;
+      padding: 32px;
+      max-width: 900px;
+      margin: 0 auto;
+    "
+  >
+    <h1>Panel (MVP): Editar Home</h1>
+
+    <div style="margin-top: 12px; padding: 12px; border: 1px solid #eee; border-radius: 12px;">
+      <div style="font-weight: 700; margin-bottom: 8px;">Imagen actual (heroImage)</div>
+      {heroImageUrl ? (
+        <img
+          src={heroImageUrl}
+          alt="Hero actual"
+          style="max-width: 100%; border-radius: 12px;"
+        />
+      ) : (
+        <div style="color: #666;">No hay imagen asignada todavía.</div>
+      )}
+    </div>
+
+    <form
+      id="homeForm"
+      style="
+        display: grid;
+        gap: 12px;
+        margin-top: 16px;
+        max-width: 720px;
+      "
+    >
+      <label>
+        <div style="font-weight: 600;">Hero Title</div>
+        <input
+          name="heroTitle"
+          value={heroTitle}
+          style="
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+          "
+        />
+      </label>
+
+      <label>
+        <div style="font-weight: 600;">Hero Subtitle</div>
+        <textarea
+          name="heroSubtitle"
+          rows="4"
+          style="
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+          "
+        >{heroSubtitle}</textarea>
+      </label>
+
+      <button
+        type="submit"
+        style="
+          padding: 10px 14px;
+          border-radius: 10px;
+          border: 0;
+          cursor: pointer;
+        "
+      >
+        Guardar textos
+      </button>
+
+      <div id="statusText" style="margin-top: 6px;"></div>
+    </form>
+
+    <hr style="margin: 24px 0;" />
+
+    <div style="max-width: 720px;">
+      <h2 style="margin: 0 0 10px 0;">Actualizar imagen (heroImage)</h2>
+
+      <div style="display: grid; gap: 10px;">
+        <input id="fileInput" type="file" accept="image/*" />
+
+        <button
+          id="btnUpload"
+          type="button"
+          style="
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 0;
+            cursor: pointer;
+          "
+        >
+          Subir y asignar imagen
+        </button>
+
+        <div id="statusImage"></div>
+
+        <div style="margin-top: 6px;">
+          Ver resultado en la web:
+          <a href="/" target="_blank">Abrir Home</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCRIPT COMPLETO -->
+    <script is:inline>
+      window.addEventListener("DOMContentLoaded", () => {
+        const form = document.querySelector("#homeForm");
+        const statusText = document.querySelector("#statusText");
+
+        const fileInput = document.querySelector("#fileInput");
+        const btnUpload = document.querySelector("#btnUpload");
+        const statusImage = document.querySelector("#statusImage");
+
+        // 1) Guardar textos
+        if (form && statusText) {
+          form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            statusText.textContent = "Guardando textos...";
+
+            const fd = new FormData(form);
+            const payload = {
+              heroTitle: String(fd.get("heroTitle") ?? ""),
+              heroSubtitle: String(fd.get("heroSubtitle") ?? ""),
+            };
+
+            try {
+              const res = await fetch("/api/panel/home", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+
+              const text = await res.text();
+              if (!res.ok) {
+                statusText.textContent = "Error al guardar textos: " + text;
+                return;
+              }
+
+              statusText.textContent = "Textos guardados correctamente.";
+            } catch (err) {
+              console.error(err);
+              statusText.textContent = "Error de red al guardar textos. Revisa consola.";
+            }
+          });
+        }
+
+        // 2) Subir imagen y asignarla
+        if (btnUpload && fileInput && statusImage) {
+          btnUpload.addEventListener("click", async () => {
+            statusImage.textContent = "";
+
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) {
+              statusImage.textContent = "Selecciona una imagen primero.";
+              return;
+            }
+
+            btnUpload.disabled = true;
+            statusImage.textContent = "Subiendo imagen a Strapi...";
+
+            try {
+              // 2.1 Subir archivo
+              const uploadFd = new FormData();
+              uploadFd.append("files", file, file.name);
+
+              const upRes = await fetch("/api/panel/upload", {
+                method: "POST",
+                body: uploadFd,
+              });
+
+              const upText = await upRes.text();
+              if (!upRes.ok) {
+                statusImage.textContent = "Error al subir: " + upText;
+                btnUpload.disabled = false;
+                return;
+              }
+
+              let uploaded;
+              try {
+                uploaded = JSON.parse(upText);
+              } catch {
+                statusImage.textContent = "Respuesta no-JSON al subir: " + upText;
+                btnUpload.disabled = false;
+                return;
+              }
+
+              // Strapi normalmente devuelve un array de archivos
+              const fileObj = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+              const fileId = fileObj?.id;
+
+              if (typeof fileId !== "number") {
+                statusImage.textContent = "No se encontró id del archivo en la respuesta: " + upText;
+                btnUpload.disabled = false;
+                return;
+              }
+
+              statusImage.textContent = "Imagen subida. Asignando a Home... (id=" + fileId + ")";
+
+              // 2.2 Asignar heroImage por id
+              const putRes = await fetch("/api/panel/home", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ heroImage: fileId }),
+              });
+
+              const putText = await putRes.text();
+              if (!putRes.ok) {
+                statusImage.textContent = "Error al asignar heroImage: " + putText;
+                btnUpload.disabled = false;
+                return;
+              }
+
+              statusImage.textContent = "Imagen asignada correctamente. Recargando para mostrar preview...";
+              window.location.reload();
+            } catch (err) {
+              console.error(err);
+              statusImage.textContent = "Error de red en upload/asignación. Revisa consola.";
+            } finally {
+              btnUpload.disabled = false;
+            }
+          });
+        }
+      });
+    </script>
+  </body>
+</html>
