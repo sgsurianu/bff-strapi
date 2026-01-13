@@ -1,0 +1,58 @@
+---
+import { getAvailableRoutes } from "../../config/editorRoutes";
+
+const routes = getAvailableRoutes();
+const currentPath = Astro.url.pathname;
+---
+
+<nav style="margin-bottom: 24px;">
+  <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+    {routes.map((route) => {
+      const isActive = currentPath === route.path;
+      return (
+        <a
+          href={route.path}
+          style={`
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: ${isActive ? "600" : "400"};
+            background: ${isActive ? "#0070f3" : "#f5f5f5"};
+            color: ${isActive ? "#fff" : "#333"};
+            transition: all 0.2s ease;
+            border: 1px solid ${isActive ? "#0070f3" : "#e0e0e0"};
+          `}
+          title={route.description}
+        >
+          {route.icon && <span>{route.icon}</span>}
+          <span>{route.label}</span>
+        </a>
+      );
+    })}
+    
+    <div style="margin-left: auto;">
+      <a
+        href="/"
+        target="_blank"
+        style="
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 10px 16px;
+          border-radius: 8px;
+          text-decoration: none;
+          background: #f5f5f5;
+          color: #333;
+          border: 1px solid #e0e0e0;
+          font-size: 0.9rem;
+        "
+      >
+        <span>👁️</span>
+        <span>Ver portal</span>
+      </a>
+    </div>
+  </div>
+</nav>

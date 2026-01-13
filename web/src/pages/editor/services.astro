@@ -1,23 +1,8 @@
 ---
+import EditorLayout from "../../layouts/EditorLayout.astro";
+import { resolveMediaUrl } from "../../utils/strapi";
+
 export const prerender = false;
-
-const STRAPI_URL = import.meta.env.PUBLIC_STRAPI_URL ?? "http://localhost:1337";
-
-function resolveMediaUrl(media) {
-  if (!media) return null;
-
-  const url =
-    media?.formats?.thumbnail?.url ??
-    media?.formats?.small?.url ??
-    media?.url ??
-    media?.data?.attributes?.formats?.thumbnail?.url ??
-    media?.data?.attributes?.url ??
-    null;
-
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  return `${STRAPI_URL}${url}`;
-}
 
 const r = await fetch(new URL("/api/panel/services", Astro.url));
 if (!r.ok) throw new Error(`No se pudo cargar services: ${r.status}`);
@@ -26,48 +11,28 @@ const json = await r.json();
 const services = Array.isArray(json?.data) ? json.data : [];
 ---
 
-<!DOCTYPE html>
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>Panel - Services</title>
-  </head>
+<EditorLayout 
+  title="Panel: Servicios" 
+  description="Gestionar servicios del portal (Collection Type: Service)"
+>
 
-  <body style="font-family: system-ui; padding: 32px; max-width: 1100px; margin: 0 auto;">
-    <header style="display:flex; align-items:center; justify-content:space-between; gap: 16px;">
-      <div>
-        <h1 style="margin:0;">Panel: Servicios</h1>
-        <p style="margin:6px 0 0 0; color:#555;">
-          Listado de servicios cargados en Strapi (Collection Type: Service)
-        </p>
-      </div>
+    <section class="card">
+      <h2 style="margin:0 0 10px 0;">Crear nuevo servicio</h2>
 
-      <div style="display:flex; gap:10px; align-items:center;">
-        <a href="/editor/home" style="text-decoration:none;">Ir a Home</a>
-        <a href="/" target="_blank" style="text-decoration:none;">Ver portal</a>
-      </div>
-    </header>
-
-    <hr style="margin: 18px 0;" />
-
-    <section style="margin: 18px 0; padding: 14px; border: 1px solid #eee; border-radius: 12px;">
-      <h2 style="margin:0 0 10px 0;">Crear nuevo servicio (MVP)</h2>
-
-      <form id="createForm" style="display:grid; gap: 10px; max-width: 760px;">
+      <form id="createForm" style="display:grid; gap: 10px;">
         <label>
           <div style="font-weight:600;">Título</div>
-          <input name="title" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px;" />
+          <input name="title" type="text" />
         </label>
 
         <label>
           <div style="font-weight:600;">Descripción</div>
-          <textarea name="description" rows="3" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px;"></textarea>
+          <textarea name="description" rows="3"></textarea>
         </label>
 
         <label>
           <div style="font-weight:600;">Icon (palabra clave)</div>
-          <input name="icon" placeholder="Ej: bell, chart, shield" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px;" />
+          <input name="icon" type="text" placeholder="Ej: bell, chart, shield" />
         </label>
 
         <label>
@@ -75,7 +40,7 @@ const services = Array.isArray(json?.data) ? json.data : [];
           <input id="fileInput" type="file" accept="image/*" />
         </label>
 
-        <button type="submit" style="padding:10px 14px; border-radius:10px; border:0; cursor:pointer; width: fit-content;">
+        <button type="submit" style="width: fit-content;">
           Crear
         </button>
 
@@ -83,7 +48,7 @@ const services = Array.isArray(json?.data) ? json.data : [];
       </form>
     </section>
 
-    <section>
+    <section class="card">
       <h2 style="margin: 0 0 10px 0;">Servicios existentes ({services.length})</h2>
 
       {services.length === 0 ? (
@@ -132,6 +97,8 @@ const services = Array.isArray(json?.data) ? json.data : [];
                       <button
                         type="submit"
                         style="padding:6px 12px; border-radius:6px; border:0; cursor:pointer; background:#dc3545; color:white; font-size:14px;"
+                        onmouseover="this.style.background='#c82333'"
+                        onmouseout="this.style.background='#dc3545'"
                       >
                         Eliminar
                       </button>
@@ -216,5 +183,4 @@ const services = Array.isArray(json?.data) ? json.data : [];
         });
       });
     </script>
-  </body>
-</html>
+</EditorLayout>

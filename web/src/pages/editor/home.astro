@@ -1,20 +1,6 @@
 ---
-const STRAPI_URL = import.meta.env.PUBLIC_STRAPI_URL ?? "http://localhost:1337";
-
-function resolveMediaUrl(media: any) {
-  if (!media) return null;
-
-  const url =
-    media?.url ??
-    media?.data?.attributes?.url ??
-    media?.data?.url ??
-    media?.attributes?.url ??
-    null;
-
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  return `${STRAPI_URL}${url}`;
-}
+import EditorLayout from "../../layouts/EditorLayout.astro";
+import { resolveMediaUrl } from "../../utils/strapi";
 
 const r = await fetch(new URL("/api/panel/home", Astro.url));
 if (!r.ok) throw new Error(`No se pudo cargar Home: ${r.status}`);
@@ -31,26 +17,10 @@ const heroImage = home?.heroImage ?? home?.attributes?.heroImage ?? null;
 const heroImageUrl = resolveMediaUrl(heroImage);
 ---
 
-<!DOCTYPE html>
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>Panel - Home</title>
-  </head>
+<EditorLayout title="Panel: Editar Home" description="Editar contenido de la página principal">
 
-  <body
-    style="
-      font-family: system-ui;
-      padding: 32px;
-      max-width: 900px;
-      margin: 0 auto;
-    "
-  >
-    <h1>Panel (MVP): Editar Home</h1>
-
-    <div style="margin-top: 12px; padding: 12px; border: 1px solid #eee; border-radius: 12px;">
-      <div style="font-weight: 700; margin-bottom: 8px;">Imagen actual (heroImage)</div>
+    <section class="card">
+      <h2 style="margin: 0 0 10px 0;">Imagen actual (heroImage)</h2>
       {heroImageUrl ? (
         <img
           src={heroImageUrl}
@@ -60,89 +30,47 @@ const heroImageUrl = resolveMediaUrl(heroImage);
       ) : (
         <div style="color: #666;">No hay imagen asignada todavía.</div>
       )}
-    </div>
+    </section>
 
-    <form
-      id="homeForm"
-      style="
-        display: grid;
-        gap: 12px;
-        margin-top: 16px;
-        max-width: 720px;
-      "
-    >
-      <label>
-        <div style="font-weight: 600;">Hero Title</div>
-        <input
-          name="heroTitle"
-          value={heroTitle}
-          style="
-            width: 100%;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-          "
-        />
-      </label>
-
-      <label>
-        <div style="font-weight: 600;">Hero Subtitle</div>
-        <textarea
-          name="heroSubtitle"
-          rows="4"
-          style="
-            width: 100%;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-          "
-        >{heroSubtitle}</textarea>
-      </label>
-
-      <button
-        type="submit"
-        style="
-          padding: 10px 14px;
-          border-radius: 10px;
-          border: 0;
-          cursor: pointer;
-        "
+    <section class="card">
+      <h2 style="margin: 0 0 10px 0;">Editar textos</h2>
+      <form
+        id="homeForm"
+        style="display: grid; gap: 12px;"
       >
-        Guardar textos
-      </button>
+        <label>
+          <div style="font-weight: 600;">Hero Title</div>
+          <input name="heroTitle" value={heroTitle} />
+        </label>
 
-      <div id="statusText" style="margin-top: 6px;"></div>
-    </form>
+        <label>
+          <div style="font-weight: 600;">Hero Subtitle</div>
+          <textarea name="heroSubtitle" rows="4">{heroSubtitle}</textarea>
+        </label>
 
-    <hr style="margin: 24px 0;" />
+        <button type="submit">Guardar textos</button>
 
-    <div style="max-width: 720px;">
+        <div id="statusText" style="margin-top: 6px;"></div>
+      </form>
+    </section>
+
+    <section class="card">
       <h2 style="margin: 0 0 10px 0;">Actualizar imagen (heroImage)</h2>
 
       <div style="display: grid; gap: 10px;">
         <input id="fileInput" type="file" accept="image/*" />
 
-        <button
-          id="btnUpload"
-          type="button"
-          style="
-            padding: 10px 14px;
-            border-radius: 10px;
-            border: 0;
-            cursor: pointer;
-          "
-        >
+        <button id="btnUpload" type="button">
           Subir y asignar imagen
         </button>
 
         <div id="statusImage"></div>
 
         <div style="margin-top: 6px;">
-          Ver resultado en la web:
-          <a href="/" target="_blank">Abrir Home</a>
+          <a href="/" target="_blank">Ver resultado en la web →</a>
         </div>
       </div>
-    </div>
+    </section>
 
     <!-- SCRIPT COMPLETO -->
     <script is:inline>
@@ -265,5 +193,4 @@ const heroImageUrl = resolveMediaUrl(heroImage);
         }
       });
     </script>
-  </body>
-</html>
+</EditorLayout>
