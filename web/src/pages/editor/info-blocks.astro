@@ -1,0 +1,199 @@
+---
+import EditorLayout from "../../layouts/EditorLayout.astro";
+import { resolveMediaUrl, getServiceImageUrl } from "../../utils/strapi";
+
+export const prerender = false;
+
+const r = await fetch(new URL("/api/panel/info-blocks", Astro.url));
+if (!r.ok) throw new Error(`No se pudo cargar info-blocks: ${r.status}`);
+
+const json = await r.json();
+const blocks = Array.isArray(json?.data) ? json.data : [];
+---
+
+<EditorLayout 
+  title="Panel: Bloques de Información Institucional" 
+  description="Gestionar los 3 bloques informativos de la página de inicio"
+>
+  <section class="card">
+    <h2 style="margin:0 0 10px 0;">Crear nuevo bloque</h2>
+
+    <form id="createForm" style="display:grid; gap: 10px;">
+      <label>
+        <div style="font-weight:600;">Título</div>
+        <input name="title" type="text" required />
+      </label>
+
+      <label>
+        <div style="font-weight:600;">Descripción</div>
+        <textarea name="description" rows="3"></textarea>
+      </label>
+
+      <label>
+        <div style="font-weight:600;">Icon (emoji o texto)</div>
+        <input name="icon" type="text" placeholder="Ej: 📊, 🎓, 📰" />
+      </label>
+
+      <label>
+        <div style="font-weight:600;">Link (opcional)</div>
+        <input name="link" type="url" placeholder="https://..." />
+      </label>
+
+      <label>
+        <div style="font-weight:600;">Orden (0 = primero)</div>
+        <input name="order" type="number" value="0" min="0" />
+      </label>
+
+      <label>
+        <div style="font-weight:600;">Imagen (opcional)</div>
+        <input id="fileInput" type="file" accept="image/*" />
+      </label>
+
+      <button type="submit" style="width: fit-content;">
+        Crear bloque
+      </button>
+
+      <div id="createStatus"></div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2 style="margin: 0 0 10px 0;">Bloques existentes ({blocks.length})</h2>
+    <p style="color: #666; margin-bottom: 12px;">
+      Solo se mostrarán los primeros 3 bloques en la página de inicio, ordenados por el campo "Orden".
+    </p>
+
+    {blocks.length === 0 ? (
+      <p style="color:#666;">No hay bloques creados.</p>
+    ) : (
+      <div style="display:grid; gap: 16px;">
+        {blocks.map((block) => {
+          const title = block?.title ?? block?.attributes?.title ?? "";
+          const description = block?.description ?? block?.attributes?.description ?? "";
+          const icon = block?.icon ?? block?.attributes?.icon ?? "";
+          const order = block?.order ?? block?.attributes?.order ?? 0;
+          const image = block?.image ?? block?.attributes?.image ?? null;
+          const imgUrl = getServiceImageUrl(image);
+          const documentId = block?.documentId ?? String(block?.id);
+
+          return (
+            <article style="display:grid; grid-template-columns: 120px 1fr; gap: 16px; padding: 16px; border: 1px solid #eee; border-radius: 12px;">
+              <div>
+                {imgUrl ? (
+                  <img src={imgUrl} alt={title} style="width:120px; height: 80px; object-fit: cover; border-radius: 8px;" />
+                ) : (
+                  <div style="width:120px; height: 80px; background:#f3f3f3; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#777;">
+                    sin imagen
+                  </div>
+                )}
+              </div>
+
+              <div style="min-width: 0;">
+                <h3 style="margin:0; line-height: 1.2;">{title}</h3>
+                {icon && <div style="font-size: 1.5rem; margin: 4px 0;">{icon}</div>}
+                <div style="margin-top: 6px; color:#555; white-space: normal;">
+                  {description}
+                </div>
+                <div style="margin-top: 8px; color:#666; font-size: 14px;">
+                  <strong>Orden:</strong> {order}
+                </div>
+
+                <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+                  <a
+                    href={`/editor/info-blocks/${documentId}`}
+                    style="
+                      display: inline-flex;
+                      align-items: center;
+                      padding: 6px 12px;
+                      border-radius: 6px;
+                      text-decoration: none;
+                      background: #0070f3;
+                      color: white;
+                      font-size: 14px;
+                    "
+                  >
+                    Editar
+                  </a>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    )}
+  </section>
+
+  <script is:inline>
+    window.addEventListener("DOMContentLoaded", () => {
+      const form = document.querySelector("#createForm");
+      const statusEl = document.querySelector("#createStatus");
+      const fileInput = document.querySelector("#fileInput");
+
+      if (!form || !statusEl) return;
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        statusEl.textContent = "Creando bloque...";
+
+        try {
+          let imageId = null;
+          const file = fileInput && fileInput.files && fileInput.files[0];
+
+          if (file) {
+            statusEl.textContent = "Subiendo imagen...";
+            const fd = new FormData();
+            fd.append("files", file, file.name);
+
+            const upRes = await fetch("/api/panel/upload", { method: "POST", body: fd });
+            const upText = await upRes.text();
+
+            if (!upRes.ok) {
+              statusEl.textContent = "Error subiendo imagen: " + upText;
+              return;
+            }
+
+            const uploaded = JSON.parse(upText);
+            const fileObj = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+            imageId = fileObj && fileObj.id ? fileObj.id : null;
+
+            if (!imageId) {
+              statusEl.textContent = "No se pudo obtener id de imagen.";
+              return;
+            }
+          }
+
+          const fd2 = new FormData(form);
+          const payload = {
+            title: String(fd2.get("title") ?? ""),
+            description: String(fd2.get("description") ?? ""),
+            icon: String(fd2.get("icon") ?? ""),
+            link: String(fd2.get("link") ?? ""),
+            order: Number(fd2.get("order") ?? 0),
+          };
+
+          if (imageId) payload.image = imageId;
+
+          statusEl.textContent = "Guardando bloque...";
+
+          const res = await fetch("/api/panel/info-blocks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          const text = await res.text();
+          if (!res.ok) {
+            statusEl.textContent = "Error creando bloque: " + text;
+            return;
+          }
+
+          statusEl.textContent = "Bloque creado. Recargando...";
+          window.location.reload();
+        } catch (err) {
+          console.error(err);
+          statusEl.textContent = "Error de red. Revisa consola.";
+        }
+      });
+    });
+  </script>
+</EditorLayout>

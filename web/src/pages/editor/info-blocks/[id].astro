@@ -1,0 +1,216 @@
+---
+import EditorLayout from "../../../layouts/EditorLayout.astro";
+import { resolveMediaUrl, getServiceImageUrl } from "../../../utils/strapi";
+
+export const prerender = false;
+
+const id = Astro.params.id;
+
+if (!id) {
+  throw new Error("Falta el parámetro id en la URL");
+}
+
+let block: any = null;
+let loadError: string | null = null;
+
+try {
+  const r = await fetch(new URL(`/api/panel/info-blocks/${id}`, Astro.url));
+  if (!r.ok) {
+    loadError = `Error ${r.status}: No se pudo cargar el bloque`;
+  } else {
+    const json = await r.json();
+    block = json?.data ?? null;
+  }
+} catch (e) {
+  loadError = e instanceof Error ? e.message : "Error desconocido";
+}
+
+const title = block?.title ?? block?.attributes?.title ?? "";
+const description = block?.description ?? block?.attributes?.description ?? "";
+const icon = block?.icon ?? block?.attributes?.icon ?? "";
+const link = block?.link ?? block?.attributes?.link ?? "";
+const order = block?.order ?? block?.attributes?.order ?? 0;
+const image = block?.image ?? block?.attributes?.image ?? null;
+const imageUrl = getServiceImageUrl(image);
+const existingImageId = image?.id ?? image?.data?.id ?? null;
+const existingImageIdStr = existingImageId !== null ? String(existingImageId) : 'null';
+---
+
+<EditorLayout 
+  title={`Panel: Editar Bloque`} 
+  description={block ? `Editar: ${title}` : "Bloque no encontrado"}
+>
+  {loadError || !block ? (
+    <section class="card error">
+      <h2>Error</h2>
+      <p>{loadError || "El bloque no existe o fue eliminado."}</p>
+      <div style="margin-top: 12px;">
+        <a href="/editor/info-blocks" style="text-decoration: none; color: #0070f3;">
+          ← Volver al listado
+        </a>
+      </div>
+    </section>
+  ) : (
+    <>
+      <section class="card">
+        <h2 style="margin: 0 0 10px 0;">Imagen actual</h2>
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={title || "Imagen del bloque"}
+            style="max-width: 100%; border-radius: 12px; margin-top: 8px;"
+          />
+        ) : (
+          <div style="color: #666; padding: 20px; text-align: center; background: #f5f5f5; border-radius: 8px;">
+            Este bloque no tiene imagen asignada.
+          </div>
+        )}
+      </section>
+
+      <section class="card">
+        <h2 style="margin: 0 0 10px 0;">Editar campos</h2>
+
+        <form id="editForm" method="post" style="display: grid; gap: 12px;" onsubmit="return false;">
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Título</div>
+            <input name="title" type="text" value={title} required />
+          </label>
+
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Descripción</div>
+            <textarea name="description" rows="4">{description}</textarea>
+          </label>
+
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Icon (emoji o texto)</div>
+            <input name="icon" type="text" value={icon} placeholder="Ej: 📊, 🎓, 📰" />
+          </label>
+
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Link (opcional)</div>
+            <input name="link" type="url" value={link} placeholder="https://..." />
+          </label>
+
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Orden (0 = primero)</div>
+            <input name="order" type="number" value={order} min="0" />
+          </label>
+
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Cambiar imagen (opcional)</div>
+            <input id="fileInput" type="file" accept="image/*" />
+          </label>
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="submit">Guardar cambios</button>
+            <a
+              href="/editor/info-blocks"
+              style="
+                display: inline-flex;
+                align-items: center;
+                padding: 10px 14px;
+                border-radius: 10px;
+                text-decoration: none;
+                background: #f5f5f5;
+                color: #333;
+                border: 1px solid #e0e0e0;
+              "
+            >
+              Cancelar
+            </a>
+          </div>
+
+          <div id="status" style="margin-top: 6px;"></div>
+        </form>
+      </section>
+
+      <script is:inline define:vars={{ documentId: id, existingImageIdStr }}>
+        window.addEventListener("DOMContentLoaded", () => {
+          const existingImageId = existingImageIdStr === 'null' ? null : Number(existingImageIdStr);
+          
+          const form = document.getElementById("editForm");
+          const statusEl = document.getElementById("status");
+          const fileInput = document.getElementById("fileInput");
+
+          if (!form || !statusEl) return;
+
+          form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            statusEl.textContent = "Guardando cambios...";
+
+            try {
+              let imageId = null;
+              const file = fileInput && fileInput.files && fileInput.files[0];
+
+              if (file) {
+                statusEl.textContent = "Subiendo imagen...";
+                const fd = new FormData();
+                fd.append("files", file, file.name);
+
+                const upRes = await fetch("/api/panel/upload", {
+                  method: "POST",
+                  body: fd,
+                });
+
+                const upText = await upRes.text();
+                if (!upRes.ok) {
+                  statusEl.textContent = "Error subiendo imagen: " + upText;
+                  return;
+                }
+
+                const uploaded = JSON.parse(upText);
+                const fileObj = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+                imageId = fileObj && fileObj.id ? fileObj.id : null;
+
+                if (!imageId) {
+                  statusEl.textContent = "No se pudo obtener id de imagen.";
+                  return;
+                }
+              }
+
+              const fd2 = new FormData(form);
+              const payload = {
+                title: String(fd2.get("title") ?? ""),
+                description: String(fd2.get("description") ?? ""),
+                icon: String(fd2.get("icon") ?? ""),
+                link: String(fd2.get("link") ?? ""),
+                order: Number(fd2.get("order") ?? 0),
+              };
+
+              if (imageId) {
+                payload.image = imageId;
+              } else if (existingImageId !== null && existingImageId !== undefined) {
+                const imgId = typeof existingImageId === 'number' ? existingImageId : Number(existingImageId);
+                if (!isNaN(imgId) && imgId > 0) {
+                  payload.image = imgId;
+                }
+              }
+
+              const res = await fetch(`/api/panel/info-blocks/${documentId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+
+              const text = await res.text();
+              if (!res.ok) {
+                statusEl.textContent = `Error guardando (HTTP ${res.status}): ${text}`;
+                statusEl.style.color = "#dc3545";
+                return;
+              }
+
+              statusEl.textContent = "✅ Guardado correctamente. Recargando...";
+              statusEl.style.color = "#28a745";
+              setTimeout(() => {
+                window.location.reload();
+              }, 500);
+            } catch (err) {
+              console.error(err);
+              statusEl.textContent = "Error de red guardando. Revisa consola.";
+            }
+          });
+        });
+      </script>
+    </>
+  )}
+</EditorLayout>

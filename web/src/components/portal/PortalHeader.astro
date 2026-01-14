@@ -1,0 +1,137 @@
+---
+import { resolveMediaUrl } from "../../utils/strapi";
+
+interface Props {
+  bannerImage?: any;
+}
+
+const { bannerImage } = Astro.props;
+const bannerUrl = resolveMediaUrl(bannerImage);
+---
+
+<header style="width: 100%;">
+  {bannerUrl && (
+    <div style="width: 100%; max-height: 200px; overflow: hidden;">
+      <img
+        src={bannerUrl}
+        alt="Banner DAGRAN"
+        style="width: 100%; height: auto; display: block; object-fit: cover;"
+      />
+    </div>
+  )}
+  
+  <nav style="background: #1a1a1a; padding: 0;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 0 20px;">
+      <ul style="
+        display: flex;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        gap: 0;
+      ">
+        <li>
+          <a
+            href="/"
+            style="
+              display: block;
+              padding: 16px 24px;
+              color: #fff;
+              text-decoration: none;
+              font-weight: 500;
+              transition: background 0.2s ease;
+            "
+            onmouseover="this.style.background='#2a2a2a'"
+            onmouseout="this.style.background='transparent'"
+          >
+            INICIO
+          </a>
+        </li>
+        <li>
+          <a
+            href="/dagran"
+            style="
+              display: block;
+              padding: 16px 24px;
+              color: #fff;
+              text-decoration: none;
+              font-weight: 500;
+              transition: background 0.2s ease;
+            "
+            onmouseover="this.style.background='#2a2a2a'"
+            onmouseout="this.style.background='transparent'"
+          >
+            DAGRAN
+          </a>
+        </li>
+        <li>
+          <a
+            href="/noticias"
+            style="
+              display: block;
+              padding: 16px 24px;
+              color: #fff;
+              text-decoration: none;
+              font-weight: 500;
+              transition: background 0.2s ease;
+            "
+            onmouseover="this.style.background='#2a2a2a'"
+            onmouseout="this.style.background='transparent'"
+          >
+            NOTICIAS
+          </a>
+        </li>
+        <li>
+          <a
+            href="/boletines"
+            style="
+              display: block;
+              padding: 16px 24px;
+              color: #fff;
+              text-decoration: none;
+              font-weight: 500;
+              transition: background 0.2s ease;
+            "
+            onmouseover="this.style.background='#2a2a2a'"
+            onmouseout="this.style.background='transparent'"
+          >
+            BOLETINES
+          </a>
+        </li>
+        <li>
+          <a
+            href="/geoportal"
+            style="
+              display: block;
+              padding: 16px 24px;
+              color: #fff;
+              text-decoration: none;
+              font-weight: 500;
+              transition: background 0.2s ease;
+            "
+            onmouseover="this.style.background='#2a2a2a'"
+            onmouseout="this.style.background='transparent'"
+          >
+            GEOPORTAL
+          </a>
+        </li>
+        <li>
+          <a
+            href="/aula-sama"
+            style="
+              display: block;
+              padding: 16px 24px;
+              color: #fff;
+              text-decoration: none;
+              font-weight: 500;
+              transition: background 0.2s ease;
+            "
+            onmouseover="this.style.background='#2a2a2a'"
+            onmouseout="this.style.background='transparent'"
+          >
+            AULA SAMA
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+</header>

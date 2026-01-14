@@ -75,6 +75,16 @@ export const PUT: APIRoute = async ({ request }) => {
     safeBody.heroImage = body.heroImage;
   }
 
+  // carouselImages debe ser un array de números (ids de upload en Strapi)
+  if (Array.isArray(body.carouselImages)) {
+    const validIds = body.carouselImages
+      .filter((id: any) => typeof id === "number" && Number.isFinite(id))
+      .map((id: number) => id);
+    if (validIds.length > 0) {
+      safeBody.carouselImages = validIds;
+    }
+  }
+
   const payload = { data: safeBody };
 
   const r = await fetch(`${STRAPI_URL}/api/home`, {

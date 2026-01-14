@@ -1,0 +1,161 @@
+---
+import EditorLayout from "../../layouts/EditorLayout.astro";
+import { resolveMediaUrl } from "../../utils/strapi";
+
+export const prerender = false;
+
+let siteSettings: any = null;
+let loadError: string | null = null;
+
+try {
+  const r = await fetch(new URL("/api/panel/site-settings", Astro.url));
+  if (!r.ok) {
+    loadError = `Error ${r.status}: No se pudo cargar Site Settings`;
+  } else {
+    const json = await r.json();
+    siteSettings = json?.data ?? null;
+  }
+} catch (e) {
+  loadError = e instanceof Error ? e.message : "Error desconocido";
+}
+
+const bannerImage = siteSettings?.bannerImage ?? siteSettings?.attributes?.bannerImage ?? null;
+const bannerImageUrl = resolveMediaUrl(bannerImage);
+const existingImageId = bannerImage?.id ?? bannerImage?.data?.id ?? null;
+const existingImageIdStr = existingImageId !== null ? String(existingImageId) : 'null';
+---
+
+<EditorLayout 
+  title="Panel: Banner Superior" 
+  description="Editar imagen del banner superior del portal"
+>
+  {loadError ? (
+    <section class="card error">
+      <h2>Error</h2>
+      <p>{loadError}</p>
+    </section>
+  ) : (
+    <>
+      <section class="card">
+        <h2 style="margin: 0 0 10px 0;">Banner actual</h2>
+        {bannerImageUrl ? (
+          <img
+            src={bannerImageUrl}
+            alt="Banner actual"
+            style="max-width: 100%; border-radius: 12px; margin-top: 8px;"
+          />
+        ) : (
+          <div style="color: #666; padding: 20px; text-align: center; background: #f5f5f5; border-radius: 8px;">
+            No hay banner configurado.
+          </div>
+        )}
+      </section>
+
+      <section class="card">
+        <h2 style="margin: 0 0 10px 0;">Actualizar banner</h2>
+
+        <form id="bannerForm" method="post" style="display: grid; gap: 12px;" onsubmit="return false;">
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Seleccionar imagen</div>
+            <input id="fileInput" type="file" accept="image/*" />
+          </label>
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="submit">Subir y guardar banner</button>
+            <a
+              href="/editor/home"
+              style="
+                display: inline-flex;
+                align-items: center;
+                padding: 10px 14px;
+                border-radius: 10px;
+                text-decoration: none;
+                background: #f5f5f5;
+                color: #333;
+                border: 1px solid #e0e0e0;
+              "
+            >
+              Cancelar
+            </a>
+          </div>
+
+          <div id="status" style="margin-top: 6px;"></div>
+        </form>
+      </section>
+
+      <script is:inline define:vars={{ existingImageIdStr }}>
+        window.addEventListener("DOMContentLoaded", () => {
+          const form = document.getElementById("bannerForm");
+          const statusEl = document.getElementById("status");
+          const fileInput = document.getElementById("fileInput");
+
+          if (!form || !statusEl || !fileInput) return;
+
+          form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            statusEl.textContent = "Subiendo imagen...";
+
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) {
+              statusEl.textContent = "Por favor selecciona una imagen.";
+              statusEl.style.color = "#dc3545";
+              return;
+            }
+
+            try {
+              const fd = new FormData();
+              fd.append("files", file, file.name);
+
+              const upRes = await fetch("/api/panel/upload", {
+                method: "POST",
+                body: fd,
+              });
+
+              const upText = await upRes.text();
+              if (!upRes.ok) {
+                statusEl.textContent = "Error subiendo imagen: " + upText;
+                statusEl.style.color = "#dc3545";
+                return;
+              }
+
+              const uploaded = JSON.parse(upText);
+              const fileObj = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+              const imageId = fileObj && fileObj.id ? fileObj.id : null;
+
+              if (!imageId) {
+                statusEl.textContent = "No se pudo obtener id de imagen.";
+                statusEl.style.color = "#dc3545";
+                return;
+              }
+
+              statusEl.textContent = "Guardando banner...";
+
+              const res = await fetch("/api/panel/site-settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ bannerImage: imageId }),
+              });
+
+              const text = await res.text();
+              if (!res.ok) {
+                statusEl.textContent = `Error guardando (HTTP ${res.status}): ${text}`;
+                statusEl.style.color = "#dc3545";
+                return;
+              }
+
+              statusEl.textContent = "✅ Banner guardado correctamente. Recargando...";
+              statusEl.style.color = "#28a745";
+              setTimeout(() => {
+                window.location.reload();
+              }, 1000);
+            } catch (err) {
+              console.error(err);
+              statusEl.textContent = "Error de red. Revisa consola.";
+              statusEl.style.color = "#dc3545";
+            }
+          });
+        });
+      </script>
+    </>
+  )}
+</EditorLayout>

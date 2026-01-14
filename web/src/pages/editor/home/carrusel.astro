@@ -1,0 +1,222 @@
+---
+import EditorLayout from "../../../layouts/EditorLayout.astro";
+import { resolveMediaUrl, getServiceImageUrl } from "../../../utils/strapi";
+
+export const prerender = false;
+
+let home: any = null;
+let loadError: string | null = null;
+
+try {
+  const r = await fetch(new URL("/api/panel/home", Astro.url));
+  if (!r.ok) {
+    loadError = `Error ${r.status}: No se pudo cargar Home`;
+  } else {
+    const json = await r.json();
+    home = json?.data ?? null;
+  }
+} catch (e) {
+  loadError = e instanceof Error ? e.message : "Error desconocido";
+}
+
+// Extraer imágenes del carrusel
+const carouselImages = home?.carouselImages ?? home?.attributes?.carouselImages ?? null;
+let images: any[] = [];
+
+if (carouselImages) {
+  // Puede venir como array directo o como objeto con data
+  if (Array.isArray(carouselImages)) {
+    images = carouselImages;
+  } else if (carouselImages?.data && Array.isArray(carouselImages.data)) {
+    images = carouselImages.data;
+  }
+}
+
+// Convertir a formato simple para el script
+const imageIds = images.map((img) => {
+  const id = img?.id ?? img?.data?.id ?? null;
+  return id;
+}).filter((id) => id !== null);
+---
+
+<EditorLayout 
+  title="Panel: Carrusel de Imágenes" 
+  description="Gestionar imágenes del carrusel de la página principal"
+>
+  {loadError ? (
+    <section class="card error">
+      <h2>Error</h2>
+      <p>{loadError}</p>
+      <div style="margin-top: 12px;">
+        <a href="/editor/home" style="text-decoration: none; color: #0070f3;">
+          ← Volver a Home
+        </a>
+      </div>
+    </section>
+  ) : (
+    <>
+      <section class="card">
+        <h2 style="margin: 0 0 10px 0;">Imágenes actuales del carrusel ({images.length})</h2>
+        
+        {images.length === 0 ? (
+          <div style="color: #666; padding: 20px; text-align: center; background: #f5f5f5; border-radius: 8px;">
+            No hay imágenes en el carrusel. Sube imágenes usando el formulario de abajo.
+          </div>
+        ) : (
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-top: 12px;">
+            {images.map((img, index) => {
+              const imgUrl = resolveMediaUrl(img);
+              return (
+                <div style="position: relative; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+                  {imgUrl ? (
+                    <img
+                      src={imgUrl}
+                      alt={`Carrusel ${index + 1}`}
+                      style="width: 100%; height: 150px; object-fit: cover; display: block;"
+                    />
+                  ) : (
+                    <div style="width: 100%; height: 150px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; color: #666;">
+                      Sin imagen
+                    </div>
+                  )}
+                  <div style="padding: 8px; font-size: 0.85rem; color: #666; text-align: center;">
+                    Imagen {index + 1}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section class="card">
+        <h2 style="margin: 0 0 10px 0;">Subir nuevas imágenes</h2>
+        <p style="color: #666; margin-bottom: 12px;">
+          Puedes seleccionar múltiples imágenes a la vez. Las nuevas imágenes reemplazarán las existentes.
+        </p>
+
+        <form id="carouselForm" method="post" style="display: grid; gap: 12px;" onsubmit="return false;">
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Seleccionar imágenes (múltiple)</div>
+            <input id="fileInput" type="file" accept="image/*" multiple />
+          </label>
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="submit">Subir y guardar imágenes</button>
+            <a
+              href="/editor/home"
+              style="
+                display: inline-flex;
+                align-items: center;
+                padding: 10px 14px;
+                border-radius: 10px;
+                text-decoration: none;
+                background: #f5f5f5;
+                color: #333;
+                border: 1px solid #e0e0e0;
+              "
+            >
+              Cancelar
+            </a>
+          </div>
+
+          <div id="status" style="margin-top: 6px;"></div>
+        </form>
+      </section>
+
+      <script is:inline define:vars={{ imageIds: JSON.stringify(imageIds) }}>
+        window.addEventListener("DOMContentLoaded", () => {
+          const currentImageIds = JSON.parse(imageIds);
+          
+          console.log("[CARRUSEL] IDs de imágenes actuales:", currentImageIds);
+          
+          const form = document.getElementById("carouselForm");
+          const statusEl = document.getElementById("status");
+          const fileInput = document.getElementById("fileInput");
+
+          if (!form || !statusEl || !fileInput) {
+            console.error("[CARRUSEL] No se encontraron elementos necesarios");
+            return;
+          }
+
+          form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            statusEl.textContent = "Procesando imágenes...";
+
+            const files = fileInput.files;
+            if (!files || files.length === 0) {
+              statusEl.textContent = "Por favor selecciona al menos una imagen.";
+              statusEl.style.color = "#dc3545";
+              return;
+            }
+
+            try {
+              statusEl.textContent = `Subiendo ${files.length} imagen(es)...`;
+
+              // Subir todas las imágenes
+              const uploadPromises = Array.from(files).map(async (file) => {
+                const fd = new FormData();
+                fd.append("files", file, file.name);
+
+                const upRes = await fetch("/api/panel/upload", {
+                  method: "POST",
+                  body: fd,
+                });
+
+                const upText = await upRes.text();
+
+                if (!upRes.ok) {
+                  throw new Error(`Error subiendo ${file.name}: ${upText}`);
+                }
+
+                const uploaded = JSON.parse(upText);
+                const fileObj = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+                const fileId = fileObj && fileObj.id ? fileObj.id : null;
+
+                if (!fileId) {
+                  throw new Error(`No se pudo obtener id de ${file.name}`);
+                }
+
+                return fileId;
+              });
+
+              const uploadedIds = await Promise.all(uploadPromises);
+              console.log("[CARRUSEL] IDs de imágenes subidas:", uploadedIds);
+
+              // Combinar con imágenes existentes si el usuario quiere mantenerlas
+              // Por ahora, reemplazamos todas con las nuevas
+              const allImageIds = uploadedIds;
+
+              statusEl.textContent = "Guardando carrusel...";
+
+              const res = await fetch("/api/panel/home", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ carouselImages: allImageIds }),
+              });
+
+              const text = await res.text();
+              console.log("[CARRUSEL] Respuesta PUT:", res.status, text);
+
+              if (!res.ok) {
+                statusEl.textContent = `Error guardando (HTTP ${res.status}): ${text}`;
+                statusEl.style.color = "#dc3545";
+                return;
+              }
+
+              statusEl.textContent = `✅ ${uploadedIds.length} imagen(es) guardada(s) correctamente. Recargando...`;
+              statusEl.style.color = "#28a745";
+              setTimeout(() => {
+                window.location.reload();
+              }, 1000);
+            } catch (err) {
+              console.error(err);
+              statusEl.textContent = `Error: ${err instanceof Error ? err.message : "Error desconocido"}`;
+              statusEl.style.color = "#dc3545";
+            }
+          });
+        });
+      </script>
+    </>
+  )}
+</EditorLayout>

@@ -1,11 +1,29 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { resolveMediaUrl, pickServiceFields, getServiceImageUrl } from "../utils/strapi";
+import PortalHeader from "../components/portal/PortalHeader.astro";
+import Carousel from "../components/portal/Carousel.astro";
+import { resolveMediaUrl, getServiceImageUrl } from "../utils/strapi";
 
 const STRAPI_URL = import.meta.env.PUBLIC_STRAPI_URL ?? "http://localhost:1337";
 
 /* ---------------------------
-   1) HOME
+   1) SITE SETTINGS (Banner)
+----------------------------*/
+let siteSettings: any = null;
+try {
+  const resSettings = await fetch(`${STRAPI_URL}/api/site-settings?populate=*`);
+  if (resSettings.ok) {
+    const json = await resSettings.json();
+    siteSettings = json?.data ?? null;
+  }
+} catch (e) {
+  console.error("Error cargando site-settings:", e);
+}
+
+const bannerImage = siteSettings?.bannerImage ?? siteSettings?.attributes?.bannerImage ?? null;
+
+/* ---------------------------
+   2) HOME (Carrusel)
 ----------------------------*/
 const resHome = await fetch(`${STRAPI_URL}/api/home?populate=*`);
 if (!resHome.ok) throw new Error(`Strapi error (home): ${resHome.status}`);
@@ -13,91 +31,132 @@ if (!resHome.ok) throw new Error(`Strapi error (home): ${resHome.status}`);
 const jsonHome = await resHome.json();
 const home = jsonHome?.data ?? null;
 
-// Compatible con variantes de estructura
-const heroTitle = home?.heroTitle ?? home?.attributes?.heroTitle ?? "";
-const heroSubtitle = home?.heroSubtitle ?? home?.attributes?.heroSubtitle ?? "";
-const heroImage = home?.heroImage ?? home?.attributes?.heroImage ?? null;
+// Extraer imágenes del carrusel
+const carouselImages = home?.carouselImages ?? home?.attributes?.carouselImages ?? null;
+let carouselImagesArray: any[] = [];
 
-const heroImageUrl = resolveMediaUrl(heroImage);
+if (carouselImages) {
+  if (Array.isArray(carouselImages)) {
+    carouselImagesArray = carouselImages;
+  } else if (carouselImages?.data && Array.isArray(carouselImages.data)) {
+    carouselImagesArray = carouselImages.data;
+  }
+}
 
 /* ---------------------------
-   2) SERVICES
+   3) INFO BLOCKS (Bloques informativos)
 ----------------------------*/
-let services = [];
-let servicesError = null;
-
+let infoBlocks: any[] = [];
 try {
-  const resServices = await fetch(
-    `${STRAPI_URL}/api/services?populate=image&sort=title:asc`
-  );
-  if (!resServices.ok) {
-    throw new Error(`Strapi error (services): ${resServices.status}`);
+  const resBlocks = await fetch(`${STRAPI_URL}/api/info-blocks?populate=*&sort=order:asc`);
+  if (resBlocks.ok) {
+    const json = await resBlocks.json();
+    const blocks = json?.data ?? [];
+    infoBlocks = Array.isArray(blocks) ? blocks : [];
   }
-
-  const jsonServices = await resServices.json();
-  const rows = jsonServices?.data ?? [];
-  services = rows.map(pickServiceFields);
 } catch (e) {
-  servicesError = e?.message ?? "Error desconocido cargando servicios.";
+  console.error("Error cargando info-blocks:", e);
 }
+
+// Limitar a 3 bloques
+const displayBlocks = infoBlocks.slice(0, 3);
 ---
 
-<BaseLayout title="Demo Strapi + Astro" description="Portal construido con Strapi y Astro">
-    <!-- HOME -->
-    <section class="card">
-      <h1>{heroTitle}</h1>
-      <p>{heroSubtitle}</p>
+<BaseLayout title="Portal DAGRAN - Inicio" description="Portal DAGRAN">
+  <PortalHeader bannerImage={bannerImage} />
 
-      {heroImageUrl && (
-        <img
-          src={heroImageUrl}
-          alt="Hero"
-          style="max-width: 100%; border-radius: 12px; margin-top: 16px;"
-          loading="lazy"
-        />
-      )}
-    </section>
+  <main style="max-width: 1200px; margin: 0 auto; padding: 32px 20px;">
+    <!-- CARRUSEL -->
+    {carouselImagesArray.length > 0 && (
+      <section style="margin-bottom: 48px;">
+        <Carousel images={carouselImagesArray} />
+      </section>
+    )}
 
-    <!-- SERVICIOS -->
-    <section class="card" style="margin-top: 24px;">
-      <h2 style="margin: 0;">Servicios</h2>
-      <p style="margin: 8px 0 0; color: #666;">
-        Fuente: <code>{STRAPI_URL}/api/services?populate=image&sort=title:asc</code>
-      </p>
+    <!-- BLOQUES DE INFORMACIÓN INSTITUCIONAL -->
+    {displayBlocks.length > 0 && (
+      <section>
+        <h2 style="margin: 0 0 24px 0; text-align: center; font-size: 2rem; color: #1a1a1a;">
+          Información Institucional
+        </h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+          {displayBlocks.map((block) => {
+            const title = block?.title ?? block?.attributes?.title ?? "";
+            const description = block?.description ?? block?.attributes?.description ?? "";
+            const icon = block?.icon ?? block?.attributes?.icon ?? "";
+            const link = block?.link ?? block?.attributes?.link ?? "";
+            const image = block?.image ?? block?.attributes?.image ?? null;
+            const imageUrl = getServiceImageUrl(image);
 
-      {servicesError ? (
-        <div class="card error" style="margin-top: 12px;">
-          <strong>No se pudieron cargar los servicios.</strong>
-          <div>{servicesError}</div>
-        </div>
-      ) : services.length === 0 ? (
-        <p style="margin-top: 12px; color: #666;">No hay servicios creados todavía.</p>
-      ) : (
-        <div class="grid">
-          {services.map((s) => {
-            const imgUrl = getServiceImageUrl(s.image);
-
-            return (
-              <article class="service">
-                <div class="service-media">
-                  {imgUrl ? (
-                    <img src={imgUrl} alt={s.title || "Servicio"} loading="lazy" />
-                  ) : (
-                    <span style="color:#666; font-size:.9rem;">Sin imagen</span>
+            const BlockContent = (
+              <div style="
+                border: 1px solid #e6e6e6;
+                border-radius: 12px;
+                overflow: hidden;
+                background: #fff;
+                transition: box-shadow 0.2s ease;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+              "
+              onmouseover="this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.1)'"
+              onmouseout="this.style.boxShadow='none'"
+              >
+                {imageUrl && (
+                  <div style="width: 100%; height: 200px; overflow: hidden;">
+                    <img
+                      src={imageUrl}
+                      alt={title}
+                      style="width: 100%; height: 100%; object-fit: cover;"
+                    />
+                  </div>
+                )}
+                <div style="padding: 20px; flex: 1; display: flex; flex-direction: column;">
+                  {icon && (
+                    <div style="font-size: 2.5rem; margin-bottom: 12px;">{icon}</div>
+                  )}
+                  <h3 style="margin: 0 0 12px 0; font-size: 1.5rem; color: #1a1a1a;">
+                    {title}
+                  </h3>
+                  {description && (
+                    <p style="margin: 0; color: #666; line-height: 1.6; flex: 1;">
+                      {description}
+                    </p>
+                  )}
+                  {link && (
+                    <a
+                      href={link}
+                      style="
+                        display: inline-block;
+                        margin-top: 16px;
+                        color: #0070f3;
+                        text-decoration: none;
+                        font-weight: 500;
+                      "
+                    >
+                      Ver más →
+                    </a>
                   )}
                 </div>
+              </div>
+            );
 
-                <div class="service-body">
-                  <h3 class="service-title">{s.title}</h3>
-                  <div class="service-meta">
-                    icon: <code>{s.icon || "-"}</code>
-                  </div>
-                  <p class="service-desc">{s.description}</p>
-                </div>
-              </article>
+            return link ? (
+              <a href={link} style="text-decoration: none; color: inherit;">
+                {BlockContent}
+              </a>
+            ) : (
+              BlockContent
             );
           })}
         </div>
-      )}
-    </section>
+      </section>
+    )}
+
+    {displayBlocks.length === 0 && (
+      <section style="text-align: center; padding: 48px 20px; color: #666;">
+        <p>No hay bloques de información institucional configurados.</p>
+      </section>
+    )}
+  </main>
 </BaseLayout>

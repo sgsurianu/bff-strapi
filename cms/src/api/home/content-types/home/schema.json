@@ -26,6 +26,14 @@
         "videos",
         "audios"
       ]
+    },
+    "carouselImages": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
     }
   }
 }

@@ -21,6 +21,24 @@ export const editorRoutes: EditorRoute[] = [
     description: "Editar contenido de la página principal",
   },
   {
+    path: "/editor/home/carrusel",
+    label: "Carrusel",
+    icon: "🖼️",
+    description: "Gestionar imágenes del carrusel",
+  },
+  {
+    path: "/editor/banner",
+    label: "Banner",
+    icon: "🎨",
+    description: "Editar banner superior del portal",
+  },
+  {
+    path: "/editor/info-blocks",
+    label: "Info Blocks",
+    icon: "📋",
+    description: "Gestionar bloques de información institucional",
+  },
+  {
     path: "/editor/services",
     label: "Servicios",
     icon: "⚙️",
