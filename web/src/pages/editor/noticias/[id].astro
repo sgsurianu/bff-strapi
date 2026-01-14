@@ -1,0 +1,283 @@
+---
+import EditorLayout from "../../../layouts/EditorLayout.astro";
+import { resolveMediaUrl, getServiceImageUrl } from "../../../utils/strapi";
+
+export const prerender = false;
+
+const id = Astro.params.id;
+
+if (!id) {
+  throw new Error("Falta el parámetro id en la URL");
+}
+
+let noticia: any = null;
+let loadError: string | null = null;
+
+try {
+  const r = await fetch(new URL(`/api/panel/noticias/${id}`, Astro.url));
+  if (!r.ok) {
+    loadError = `Error ${r.status}: No se pudo cargar la noticia`;
+  } else {
+    const json = await r.json();
+    noticia = json?.data ?? null;
+  }
+} catch (e) {
+  loadError = e instanceof Error ? e.message : "Error desconocido";
+}
+
+const title = noticia?.title ?? noticia?.attributes?.title ?? "";
+const content = noticia?.content ?? noticia?.attributes?.content ?? "";
+const excerpt = noticia?.excerpt ?? noticia?.attributes?.excerpt ?? "";
+const author = noticia?.author ?? noticia?.attributes?.author ?? "";
+const publishedDate = noticia?.publishedDate ?? noticia?.attributes?.publishedDate ?? "";
+const tags = noticia?.tags ?? noticia?.attributes?.tags ?? [];
+const tagsString = Array.isArray(tags) ? tags.join(", ") : "";
+
+const image = noticia?.image ?? noticia?.attributes?.image ?? null;
+const imageUrl = getServiceImageUrl(image);
+const existingImageId = image?.id ?? image?.data?.id ?? null;
+const existingImageIdStr = existingImageId !== null ? String(existingImageId) : 'null';
+---
+
+<EditorLayout 
+  title={`Panel: Editar Noticia`} 
+  description={noticia ? `Editar: ${title}` : "Noticia no encontrada"}
+>
+  {loadError || !noticia ? (
+    <section class="card error">
+      <h2>Error</h2>
+      <p>{loadError || "La noticia no existe o fue eliminada."}</p>
+      <div style="margin-top: 12px;">
+        <a href="/editor/noticias" style="text-decoration: none; color: #0070f3;">
+          ← Volver al listado
+        </a>
+      </div>
+    </section>
+  ) : (
+    <>
+      <section class="card">
+        <h2 style="margin: 0 0 6px 0;">Editar Noticia</h2>
+        <p style="color: #666; margin: 0 0 20px 0;">ID: {id}</p>
+
+        {imageUrl && (
+          <div style="margin-bottom: 20px;">
+            <div style="font-weight: 600; margin-bottom: 8px;">Imagen actual:</div>
+            <img
+              src={imageUrl}
+              alt="Imagen actual"
+              style="max-width: 400px; border-radius: 8px; border: 1px solid #e0e0e0;"
+            />
+          </div>
+        )}
+
+        <form
+          id="editForm"
+          method="post"
+          onsubmit="return false;"
+          style="display: grid; gap: 16px;"
+        >
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Título *</div>
+            <input
+              type="text"
+              name="title"
+              value={title}
+              required
+              style="width: 100%;"
+            />
+          </label>
+
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Extracto (resumen corto)</div>
+            <textarea
+              name="excerpt"
+              rows="3"
+              style="width: 100%;"
+            >{excerpt}</textarea>
+          </label>
+
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Contenido *</div>
+            <textarea
+              name="content"
+              rows="10"
+              required
+              style="width: 100%; font-family: monospace;"
+            >{content}</textarea>
+          </label>
+
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Autor</div>
+            <input
+              type="text"
+              name="author"
+              value={author}
+              placeholder="Nombre del autor"
+              style="width: 100%;"
+            />
+          </label>
+
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Fecha de publicación</div>
+            <input
+              type="date"
+              name="publishedDate"
+              value={publishedDate ? new Date(publishedDate).toISOString().split('T')[0] : ''}
+              style="width: 100%;"
+            />
+          </label>
+
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">
+              Etiquetas (separadas por comas)
+            </div>
+            <input
+              type="text"
+              name="tags"
+              value={tagsString}
+              placeholder="tecnología, innovación, educación"
+              style="width: 100%;"
+            />
+            <div style="font-size: 0.85rem; color: #666; margin-top: 4px;">
+              Ejemplo: tecnología, salud, educación
+            </div>
+          </label>
+
+          <label>
+            <div style="font-weight: 600; margin-bottom: 6px;">Cambiar imagen (opcional)</div>
+            <input id="fileInput" type="file" accept="image/*" />
+          </label>
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="submit">Guardar cambios</button>
+            <a
+              href="/editor/noticias"
+              style="
+                display: inline-flex;
+                align-items: center;
+                padding: 10px 14px;
+                border-radius: 10px;
+                text-decoration: none;
+                background: #f5f5f5;
+                color: #333;
+                border: 1px solid #e0e0e0;
+              "
+            >
+              Cancelar
+            </a>
+          </div>
+
+          <div id="statusMessage" style="margin-top: 6px; font-weight: 500;"></div>
+        </form>
+      </section>
+    </>
+  )}
+
+  <script is:inline define:vars={{ documentId: id, existingImageIdStr }}>
+    window.addEventListener("DOMContentLoaded", () => {
+      const form = document.querySelector("#editForm");
+      const fileInput = document.querySelector("#fileInput");
+      const statusMessage = document.querySelector("#statusMessage");
+      const existingImageId = existingImageIdStr === 'null' ? null : Number(existingImageIdStr);
+
+      if (!form || !statusMessage) return;
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        statusMessage.textContent = "Guardando cambios...";
+        statusMessage.style.color = "#0070f3";
+
+        const fd = new FormData(form);
+        const file = fileInput?.files && fileInput.files[0];
+
+        let imageId = existingImageId;
+
+        // Si hay una nueva imagen, subirla primero
+        if (file) {
+          statusMessage.textContent = "Subiendo nueva imagen...";
+          
+          const uploadFd = new FormData();
+          uploadFd.append("files", file, file.name);
+
+          try {
+            const upRes = await fetch("/api/panel/upload", {
+              method: "POST",
+              body: uploadFd,
+            });
+
+            if (!upRes.ok) {
+              const upText = await upRes.text();
+              statusMessage.textContent = "Error al subir imagen: " + upText;
+              statusMessage.style.color = "#ff4444";
+              return;
+            }
+
+            const uploaded = await upRes.json();
+            const fileObj = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+            imageId = fileObj?.id ?? null;
+
+            if (typeof imageId !== "number") {
+              statusMessage.textContent = "Error: no se obtuvo el ID de la imagen subida";
+              statusMessage.style.color = "#ff4444";
+              return;
+            }
+          } catch (err) {
+            console.error("Error subiendo imagen:", err);
+            statusMessage.textContent = "Error de red al subir imagen";
+            statusMessage.style.color = "#ff4444";
+            return;
+          }
+        }
+
+        // Procesar etiquetas
+        const tagsInput = String(fd.get("tags") ?? "");
+        const tagsArray = tagsInput
+          .split(",")
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0);
+
+        // Construir payload
+        const payload = {
+          title: String(fd.get("title") ?? ""),
+          content: String(fd.get("content") ?? ""),
+          excerpt: String(fd.get("excerpt") ?? ""),
+          author: String(fd.get("author") ?? ""),
+          publishedDate: String(fd.get("publishedDate") ?? "") || null,
+          tags: tagsArray,
+        };
+
+        if (typeof imageId === "number") {
+          payload.image = imageId;
+        }
+
+        statusMessage.textContent = "Guardando noticia...";
+
+        try {
+          const res = await fetch(`/api/panel/noticias/${documentId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) {
+            const text = await res.text();
+            statusMessage.textContent = "Error al guardar: " + text;
+            statusMessage.style.color = "#ff4444";
+            return;
+          }
+
+          statusMessage.textContent = "✓ Cambios guardados correctamente. Redirigiendo...";
+          statusMessage.style.color = "#00aa00";
+
+          setTimeout(() => {
+            window.location.href = "/editor/noticias";
+          }, 1500);
+        } catch (err) {
+          console.error("Error guardando:", err);
+          statusMessage.textContent = "Error de red al guardar";
+          statusMessage.style.color = "#ff4444";
+        }
+      });
+    });
+  </script>
+</EditorLayout>

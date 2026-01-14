@@ -49,13 +49,13 @@ export const editorRoutes: EditorRoute[] = [
     isSubRoute: true,
   },
   
-  // GRUPO: SERVICIOS (separado de Inicio)
+  // GRUPO: NOTICIAS (gestión de noticias diarias)
   {
-    path: "/editor/servicios",
-    label: "Servicios",
-    icon: "⚙️",
-    description: "Gestionar servicios del portal",
-    group: "servicios",
+    path: "/editor/noticias",
+    label: "Noticias",
+    icon: "📰",
+    description: "Gestionar noticias del portal con paginación y etiquetas",
+    group: "noticias",
   },
   
   // Futuras rutas se agregarán aquí con sus respectivos grupos

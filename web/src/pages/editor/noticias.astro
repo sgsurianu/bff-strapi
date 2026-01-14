@@ -1,0 +1,279 @@
+---
+import EditorLayout from "../../layouts/EditorLayout.astro";
+
+export const prerender = false;
+
+// Obtener parámetros de búsqueda
+const page = parseInt(Astro.url.searchParams.get("page") || "1");
+const search = Astro.url.searchParams.get("search") || "";
+const tag = Astro.url.searchParams.get("tag") || "";
+
+const params = new URLSearchParams({
+  page: String(page),
+  pageSize: "10",
+});
+
+if (search) params.append("search", search);
+if (tag) params.append("tag", tag);
+
+const r = await fetch(
+  new URL(`/api/panel/noticias?${params.toString()}`, Astro.url)
+);
+
+if (!r.ok) {
+  throw new Error(`No se pudo cargar las noticias: ${r.status}`);
+}
+
+const json = await r.json();
+const noticias = json?.data ?? [];
+const pagination = json?.meta?.pagination ?? null;
+
+// Extraer todas las etiquetas únicas para el filtro
+const allTags = new Set<string>();
+noticias.forEach((n: any) => {
+  const tags = n?.tags ?? n?.attributes?.tags ?? [];
+  if (Array.isArray(tags)) {
+    tags.forEach((t: string) => allTags.add(t));
+  }
+});
+---
+
+<EditorLayout 
+  title="Panel: Noticias" 
+  description="Gestionar noticias del portal"
+>
+  <section class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h2 style="margin: 0;">Noticias del portal</h2>
+      <a
+        href="/editor/noticias/nueva"
+        style="
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 12px 20px;
+          border-radius: 10px;
+          text-decoration: none;
+          background: #0070f3;
+          color: #fff;
+          font-weight: 600;
+        "
+      >
+        ➕ Nueva noticia
+      </a>
+    </div>
+
+    <!-- Filtros de búsqueda -->
+    <form 
+      method="GET" 
+      style="
+        display: grid;
+        gap: 12px;
+        padding: 16px;
+        background: #f9f9f9;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      "
+    >
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <label>
+          <div style="font-weight: 600; margin-bottom: 4px;">Buscar por texto</div>
+          <input 
+            type="text" 
+            name="search" 
+            value={search}
+            placeholder="Buscar en título o contenido..."
+            style="width: 100%;"
+          />
+        </label>
+
+        <label>
+          <div style="font-weight: 600; margin-bottom: 4px;">Filtrar por etiqueta</div>
+          <select name="tag" style="width: 100%;">
+            <option value="">Todas las etiquetas</option>
+            {Array.from(allTags).sort().map((t) => (
+              <option value={t} selected={tag === t}>{t}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <button type="submit" style="padding: 10px 20px;">
+          🔍 Buscar
+        </button>
+        <a
+          href="/editor/noticias"
+          style="
+            display: inline-flex;
+            align-items: center;
+            padding: 10px 20px;
+            border-radius: 10px;
+            text-decoration: none;
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #e0e0e0;
+          "
+        >
+          Limpiar filtros
+        </a>
+      </div>
+    </form>
+
+    <!-- Información de resultados -->
+    {pagination && (
+      <div style="color: #666; margin-bottom: 16px;">
+        Mostrando {noticias.length} de {pagination.total} noticia{pagination.total !== 1 ? 's' : ''}
+        {search && ` (búsqueda: "${search}")`}
+        {tag && ` (etiqueta: "${tag}")`}
+      </div>
+    )}
+
+    <!-- Lista de noticias -->
+    {noticias.length === 0 ? (
+      <div style="text-align: center; padding: 40px; color: #666;">
+        No se encontraron noticias.
+      </div>
+    ) : (
+      <div style="display: grid; gap: 16px;">
+        {noticias.map((n: any) => {
+          const title = n?.title ?? n?.attributes?.title ?? "Sin título";
+          const excerpt = n?.excerpt ?? n?.attributes?.excerpt ?? "";
+          const content = n?.content ?? n?.attributes?.content ?? "";
+          const documentId = n?.documentId ?? String(n?.id);
+          const tags = n?.tags ?? n?.attributes?.tags ?? [];
+          const publishedDate = n?.publishedDate ?? n?.attributes?.publishedDate ?? 
+                               n?.createdAt ?? n?.attributes?.createdAt ?? "";
+
+          return (
+            <div
+              style="
+                padding: 20px;
+                border: 1px solid #e0e0e0;
+                border-radius: 12px;
+                background: #fff;
+              "
+            >
+              <div style="display: flex; justify-content: space-between; align-items: start; gap: 16px;">
+                <div style="flex: 1;">
+                  <h3 style="margin: 0 0 8px 0; color: #1a1a1a;">
+                    {title}
+                  </h3>
+                  {excerpt && (
+                    <p style="margin: 0 0 12px 0; color: #666; font-size: 0.9rem;">
+                      {excerpt}
+                    </p>
+                  )}
+                  {publishedDate && (
+                    <div style="color: #999; font-size: 0.85rem; margin-bottom: 8px;">
+                      📅 {new Date(publishedDate).toLocaleDateString('es-ES')}
+                    </div>
+                  )}
+                  {Array.isArray(tags) && tags.length > 0 && (
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+                      {tags.map((t: string) => (
+                        <span
+                          style="
+                            padding: 4px 8px;
+                            background: #e8f4ff;
+                            color: #0070f3;
+                            font-size: 0.75rem;
+                            border-radius: 4px;
+                            font-weight: 500;
+                          "
+                        >
+                          #{t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div style="display: flex; gap: 8px;">
+                  <a
+                    href={`/editor/noticias/${documentId}`}
+                    style="
+                      display: inline-flex;
+                      align-items: center;
+                      padding: 10px 14px;
+                      border-radius: 10px;
+                      text-decoration: none;
+                      background: #0070f3;
+                      color: #fff;
+                      font-weight: 500;
+                    "
+                  >
+                    ✏️ Editar
+                  </a>
+
+                  <form
+                    method="POST"
+                    action={`/api/panel/noticias/${documentId}/delete`}
+                    onsubmit="return confirm('¿Seguro que deseas eliminar esta noticia? Esta acción no se puede deshacer.');"
+                    style="display:inline;"
+                  >
+                    <button
+                      type="submit"
+                      style="
+                        padding: 10px 14px;
+                        border-radius: 10px;
+                        border: 0;
+                        cursor: pointer;
+                        background: #ff4444;
+                        color: #fff;
+                        font-weight: 500;
+                      "
+                    >
+                      🗑️
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+
+    <!-- Paginación -->
+    {pagination && pagination.pageCount > 1 && (
+      <div style="margin-top: 24px; display: flex; gap: 8px; justify-content: center; align-items: center;">
+        {pagination.page > 1 && (
+          <a
+            href={`/editor/noticias?page=${pagination.page - 1}${search ? `&search=${search}` : ''}${tag ? `&tag=${tag}` : ''}`}
+            style="
+              padding: 8px 16px;
+              border-radius: 8px;
+              text-decoration: none;
+              background: #f5f5f5;
+              color: #333;
+              border: 1px solid #e0e0e0;
+            "
+          >
+            ← Anterior
+          </a>
+        )}
+
+        <span style="color: #666;">
+          Página {pagination.page} de {pagination.pageCount}
+        </span>
+
+        {pagination.page < pagination.pageCount && (
+          <a
+            href={`/editor/noticias?page=${pagination.page + 1}${search ? `&search=${search}` : ''}${tag ? `&tag=${tag}` : ''}`}
+            style="
+              padding: 8px 16px;
+              border-radius: 8px;
+              text-decoration: none;
+              background: #f5f5f5;
+              color: #333;
+              border: 1px solid #e0e0e0;
+            "
+          >
+            Siguiente →
+          </a>
+        )}
+      </div>
+    )}
+  </section>
+</EditorLayout>
