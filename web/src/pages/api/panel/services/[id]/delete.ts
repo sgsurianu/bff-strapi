@@ -58,7 +58,7 @@ export const POST: APIRoute = async ({ params }) => {
     return new Response(null, {
       status: 302,
       headers: {
-        Location: "/editor/services",
+        Location: "/editor/servicios",
       },
     });
   } catch (error) {

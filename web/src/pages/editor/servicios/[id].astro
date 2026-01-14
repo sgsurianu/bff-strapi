@@ -4,48 +4,47 @@ import { resolveMediaUrl, getServiceImageUrl } from "../../../utils/strapi";
 
 export const prerender = false;
 
-const id = Astro.params.id;
+const id = Astro.params.id; // documentId
 
 if (!id) {
   throw new Error("Falta el parámetro id en la URL");
 }
 
-let block: any = null;
+let service: any = null;
 let loadError: string | null = null;
 
 try {
-  const r = await fetch(new URL(`/api/panel/info-blocks/${id}`, Astro.url));
+  const r = await fetch(new URL(`/api/panel/services/${id}`, Astro.url));
   if (!r.ok) {
-    loadError = `Error ${r.status}: No se pudo cargar el bloque`;
+    loadError = `Error ${r.status}: No se pudo cargar el servicio`;
   } else {
     const json = await r.json();
-    block = json?.data ?? null;
+    service = json?.data ?? null;
   }
 } catch (e) {
   loadError = e instanceof Error ? e.message : "Error desconocido";
 }
 
-const title = block?.title ?? block?.attributes?.title ?? "";
-const description = block?.description ?? block?.attributes?.description ?? "";
-const icon = block?.icon ?? block?.attributes?.icon ?? "";
-const link = block?.link ?? block?.attributes?.link ?? "";
-const order = block?.order ?? block?.attributes?.order ?? 0;
-const image = block?.image ?? block?.attributes?.image ?? null;
+// Extraer campos del servicio
+const title = service?.title ?? service?.attributes?.title ?? "";
+const description = service?.description ?? service?.attributes?.description ?? "";
+const icon = service?.icon ?? service?.attributes?.icon ?? "";
+const image = service?.image ?? service?.attributes?.image ?? null;
 const imageUrl = getServiceImageUrl(image);
 const existingImageId = image?.id ?? image?.data?.id ?? null;
 const existingImageIdStr = existingImageId !== null ? String(existingImageId) : 'null';
 ---
 
 <EditorLayout 
-  title={`Panel: Editar Bloque`} 
-  description={block ? `Editar: ${title}` : "Bloque no encontrado"}
+  title={`Panel: Editar Servicio`} 
+  description={service ? `Editar: ${title}` : "Servicio no encontrado"}
 >
-  {loadError || !block ? (
+  {loadError || !service ? (
     <section class="card error">
       <h2>Error</h2>
-      <p>{loadError || "El bloque no existe o fue eliminado."}</p>
+      <p>{loadError || "El servicio no existe o fue eliminado."}</p>
       <div style="margin-top: 12px;">
-        <a href="/editor/info-blocks" style="text-decoration: none; color: #0070f3;">
+        <a href="/editor/servicios" style="text-decoration: none; color: #0070f3;">
           ← Volver al listado
         </a>
       </div>
@@ -57,12 +56,12 @@ const existingImageIdStr = existingImageId !== null ? String(existingImageId) : 
         {imageUrl ? (
           <img
             src={imageUrl}
-            alt={title || "Imagen del bloque"}
+            alt={title || "Imagen del servicio"}
             style="max-width: 100%; border-radius: 12px; margin-top: 8px;"
           />
         ) : (
           <div style="color: #666; padding: 20px; text-align: center; background: #f5f5f5; border-radius: 8px;">
-            Este bloque no tiene imagen asignada.
+            Este servicio no tiene imagen asignada.
           </div>
         )}
       </section>
@@ -73,7 +72,7 @@ const existingImageIdStr = existingImageId !== null ? String(existingImageId) : 
         <form id="editForm" method="post" style="display: grid; gap: 12px;" onsubmit="return false;">
           <label>
             <div style="font-weight: 600; margin-bottom: 6px;">Título</div>
-            <input name="title" type="text" value={title} required />
+            <input name="title" type="text" value={title} />
           </label>
 
           <label>
@@ -82,18 +81,8 @@ const existingImageIdStr = existingImageId !== null ? String(existingImageId) : 
           </label>
 
           <label>
-            <div style="font-weight: 600; margin-bottom: 6px;">Icon (emoji o texto)</div>
-            <input name="icon" type="text" value={icon} placeholder="Ej: 📊, 🎓, 📰" />
-          </label>
-
-          <label>
-            <div style="font-weight: 600; margin-bottom: 6px;">Link (opcional)</div>
-            <input name="link" type="url" value={link} placeholder="https://..." />
-          </label>
-
-          <label>
-            <div style="font-weight: 600; margin-bottom: 6px;">Orden (0 = primero)</div>
-            <input name="order" type="number" value={order} min="0" />
+            <div style="font-weight: 600; margin-bottom: 6px;">Icon (palabra clave)</div>
+            <input name="icon" type="text" value={icon} placeholder="Ej: bell, chart, shield" />
           </label>
 
           <label>
@@ -104,7 +93,7 @@ const existingImageIdStr = existingImageId !== null ? String(existingImageId) : 
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">
             <button type="submit">Guardar cambios</button>
             <a
-              href="/editor/info-blocks"
+              href="/editor/servicios"
               style="
                 display: inline-flex;
                 align-items: center;
@@ -128,11 +117,17 @@ const existingImageIdStr = existingImageId !== null ? String(existingImageId) : 
         window.addEventListener("DOMContentLoaded", () => {
           const existingImageId = existingImageIdStr === 'null' ? null : Number(existingImageIdStr);
           
+          console.log("[EDIT] documentId:", documentId);
+          console.log("[EDIT] existingImageId:", existingImageId);
+          
           const form = document.getElementById("editForm");
           const statusEl = document.getElementById("status");
           const fileInput = document.getElementById("fileInput");
 
-          if (!form || !statusEl) return;
+          if (!form || !statusEl) {
+            console.error("[EDIT] No se encontró el formulario o el elemento de estado");
+            return;
+          }
 
           form.addEventListener("submit", async (e) => {
             e.preventDefault();
@@ -151,8 +146,8 @@ const existingImageIdStr = existingImageId !== null ? String(existingImageId) : 
                   method: "POST",
                   body: fd,
                 });
-
                 const upText = await upRes.text();
+
                 if (!upRes.ok) {
                   statusEl.textContent = "Error subiendo imagen: " + upText;
                   return;
@@ -173,10 +168,9 @@ const existingImageIdStr = existingImageId !== null ? String(existingImageId) : 
                 title: String(fd2.get("title") ?? ""),
                 description: String(fd2.get("description") ?? ""),
                 icon: String(fd2.get("icon") ?? ""),
-                link: String(fd2.get("link") ?? ""),
-                order: Number(fd2.get("order") ?? 0),
               };
 
+              // Preservar imagen: usar la nueva si se subió, sino la existente
               if (imageId) {
                 payload.image = imageId;
               } else if (existingImageId !== null && existingImageId !== undefined) {
@@ -186,13 +180,20 @@ const existingImageIdStr = existingImageId !== null ? String(existingImageId) : 
                 }
               }
 
-              const res = await fetch(`/api/panel/info-blocks/${documentId}`, {
+              console.log("[EDIT] Payload a enviar:", payload);
+              console.log("[EDIT] URL:", `/api/panel/services/${documentId}`);
+
+              statusEl.textContent = "Guardando cambios...";
+
+              const res = await fetch(`/api/panel/services/${documentId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
               });
 
               const text = await res.text();
+              console.log("[EDIT] Respuesta PUT:", res.status, text);
+              
               if (!res.ok) {
                 statusEl.textContent = `Error guardando (HTTP ${res.status}): ${text}`;
                 statusEl.style.color = "#dc3545";
@@ -202,8 +203,8 @@ const existingImageIdStr = existingImageId !== null ? String(existingImageId) : 
               statusEl.textContent = "✅ Guardado correctamente. Recargando...";
               statusEl.style.color = "#28a745";
               setTimeout(() => {
-                window.location.reload();
-              }, 500);
+                window.location.href = `/editor/services/${documentId}`;
+              }, 1000);
             } catch (err) {
               console.error(err);
               statusEl.textContent = "Error de red guardando. Revisa consola.";
