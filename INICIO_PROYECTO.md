@@ -26,7 +26,7 @@ Una vez que ambos servicios estén corriendo, abre estos enlaces en tu navegador
 
 ### Frontend (Astro)
 - **Página principal:** http://localhost:4321/
-- **Editor Home:** http://localhost:4321/editor/home
+- **Editor Home:** http://localhost:4321/editor/inicio
 
 ### Backend (Strapi)
 - **Panel de administración:** http://localhost:1337/admin

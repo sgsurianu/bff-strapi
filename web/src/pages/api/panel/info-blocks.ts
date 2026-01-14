@@ -10,7 +10,18 @@ const TOKEN = import.meta.env.STRAPI_API_TOKEN;
  * Lista los bloques de información institucional.
  */
 export const GET: APIRoute = async () => {
-  const r = await fetch(`${STRAPI_URL}/api/info-blocks?populate=*&sort=order:asc`);
+  if (!TOKEN) {
+    return new Response(
+      JSON.stringify({ error: "STRAPI_API_TOKEN no configurado" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  const r = await fetch(`${STRAPI_URL}/api/info-blocks?populate=*&sort=order:asc`, {
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+    },
+  });
   const txt = await r.text();
 
   return new Response(txt, {

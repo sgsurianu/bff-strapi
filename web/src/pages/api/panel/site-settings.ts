@@ -10,13 +10,33 @@ const TOKEN = import.meta.env.STRAPI_API_TOKEN;
  * Obtiene la configuración del sitio (banner, etc.)
  */
 export const GET: APIRoute = async () => {
-  const r = await fetch(`${STRAPI_URL}/api/site-settings?populate=*`);
-  const txt = await r.text();
+  if (!TOKEN) {
+    return new Response(
+      JSON.stringify({ error: "STRAPI_API_TOKEN no configurado" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
 
-  return new Response(txt, {
-    status: r.status,
-    headers: { "Content-Type": "application/json" },
-  });
+  try {
+    const r = await fetch(`${STRAPI_URL}/api/site-setting?populate=*`, {
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+      },
+    });
+
+    const txt = await r.text();
+
+    return new Response(txt, {
+      status: r.status,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("Error en GET /api/panel/site-settings:", err);
+    return new Response(
+      JSON.stringify({ error: String(err) }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
 };
 
 /**
@@ -63,7 +83,7 @@ export const PUT: APIRoute = async ({ request }) => {
 
   const payload = { data: safeBody };
 
-  const r = await fetch(`${STRAPI_URL}/api/site-settings`, {
+  const r = await fetch(`${STRAPI_URL}/api/site-setting`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",

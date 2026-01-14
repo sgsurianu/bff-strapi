@@ -12,7 +12,18 @@ const TOKEN = import.meta.env.STRAPI_API_TOKEN;
  * - Más adelante: podemos exigir auth del panel.
  */
 export const GET: APIRoute = async () => {
-  const r = await fetch(`${STRAPI_URL}/api/services?populate=*`);
+  if (!TOKEN) {
+    return new Response(
+      JSON.stringify({ error: "STRAPI_API_TOKEN no configurado" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  const r = await fetch(`${STRAPI_URL}/api/services?populate=*`, {
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+    },
+  });
   const txt = await r.text();
 
   return new Response(txt, {

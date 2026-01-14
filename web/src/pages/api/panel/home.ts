@@ -10,7 +10,18 @@ const TOKEN = import.meta.env.STRAPI_API_TOKEN;
  * Proxy server-side para leer el single type Home desde Strapi.
  */
 export const GET: APIRoute = async () => {
-  const r = await fetch(`${STRAPI_URL}/api/home?populate=*`);
+  if (!TOKEN) {
+    return new Response(
+      JSON.stringify({ error: "STRAPI_API_TOKEN no configurado" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  const r = await fetch(`${STRAPI_URL}/api/home?populate=*`, {
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+    },
+  });
   const txt = await r.text();
 
   return new Response(txt, {

@@ -4,29 +4,28 @@ import PortalHeader from "../components/portal/PortalHeader.astro";
 import Carousel from "../components/portal/Carousel.astro";
 import { resolveMediaUrl, getServiceImageUrl } from "../utils/strapi";
 
-const STRAPI_URL = import.meta.env.PUBLIC_STRAPI_URL ?? "http://localhost:1337";
-
 /* ---------------------------
    1) SITE SETTINGS (Banner)
 ----------------------------*/
 let siteSettings: any = null;
+let bannerImage: any = null;
+
 try {
-  const resSettings = await fetch(`${STRAPI_URL}/api/site-settings?populate=*`);
+  const resSettings = await fetch(new URL("/api/panel/site-settings", Astro.url));
   if (resSettings.ok) {
     const json = await resSettings.json();
     siteSettings = json?.data ?? null;
+    bannerImage = siteSettings?.bannerImage ?? siteSettings?.attributes?.bannerImage ?? null;
   }
 } catch (e) {
   console.error("Error cargando site-settings:", e);
 }
 
-const bannerImage = siteSettings?.bannerImage ?? siteSettings?.attributes?.bannerImage ?? null;
-
 /* ---------------------------
    2) HOME (Carrusel)
 ----------------------------*/
-const resHome = await fetch(`${STRAPI_URL}/api/home?populate=*`);
-if (!resHome.ok) throw new Error(`Strapi error (home): ${resHome.status}`);
+const resHome = await fetch(new URL("/api/panel/home", Astro.url));
+if (!resHome.ok) throw new Error(`BFF error (home): ${resHome.status}`);
 
 const jsonHome = await resHome.json();
 const home = jsonHome?.data ?? null;
@@ -48,7 +47,7 @@ if (carouselImages) {
 ----------------------------*/
 let infoBlocks: any[] = [];
 try {
-  const resBlocks = await fetch(`${STRAPI_URL}/api/info-blocks?populate=*&sort=order:asc`);
+  const resBlocks = await fetch(new URL("/api/panel/info-blocks", Astro.url));
   if (resBlocks.ok) {
     const json = await resBlocks.json();
     const blocks = json?.data ?? [];

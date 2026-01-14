@@ -18,7 +18,18 @@ export const GET: APIRoute = async ({ params }) => {
     });
   }
 
-  const r = await fetch(`${STRAPI_URL}/api/services/${documentId}?populate=*`);
+  if (!TOKEN) {
+    return new Response(
+      JSON.stringify({ error: "STRAPI_API_TOKEN no configurado" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  const r = await fetch(`${STRAPI_URL}/api/services/${documentId}?populate=*`, {
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+    },
+  });
   const txt = await r.text();
 
   return new Response(txt, {
