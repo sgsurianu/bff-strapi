@@ -37,3 +37,10 @@ build/
 # Temporary files
 *.tmp
 *.temp
+
+# Database backups (mantener local, no subir a Git)
+cms/backups/db/*.db
+cms/backups/*.log
+
+# CRÍTICO: Base de datos de Strapi (NO subir, NO borrar sin backup)
+cms/.tmp/data.db*

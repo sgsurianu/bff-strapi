@@ -1,0 +1,3 @@
+# Esta carpeta contiene backups de la base de datos
+# Los backups NO se suben a Git por seguridad
+# Pero la carpeta debe existir para los scripts
